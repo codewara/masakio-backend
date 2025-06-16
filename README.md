@@ -64,7 +64,3 @@ The server will run on the port specified in your `.env` file (default: 3000).
 ├── package.json
 └── README.md
 ```
-
-## License
-
-ISC
