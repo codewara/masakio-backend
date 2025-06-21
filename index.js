@@ -1,11 +1,7 @@
-require('dotenv').config();
-
 const cloudinary = require('./cloudinary');
 const express = require('express');
 const cors = require('cors');
 const db = require('./db');
-
-const PORT = process.env.DB_PORT || 3000;
 
 const app = express();
 app.use(cors());
@@ -56,7 +52,7 @@ app.post('/unwish/:id', (req, res) => {
   );
 });
 
-app.listen(PORT, () => {
+app.listen(3000, () => {
   db.getConnection((err) => {
     if (err) {
       console.error('Database connection failed:', err);
