@@ -16,6 +16,7 @@
     "cookie": "^0.7.2",
     "cookie-signature": "^1.2.2",
     "cors": "^2.8.5",
+    "crypto": "^1.0.1",
     "debug": "^4.4.1",
     "denque": "^2.1.0",
     "depd": "^2.0.0",
