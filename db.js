@@ -5,7 +5,7 @@ host = process.env.DB_HOST;
 user = process.env.DB_USER;
 pass = process.env.DB_PASSWORD;
 database = process.env.DB_NAME;
-port = process.env.PORT;
+port = process.env.DB_PORT;
 
 const db = mysql.createPool(`mysql://${user}:${pass}@${host}:${port}/${database}`);
 
