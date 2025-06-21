@@ -11,6 +11,13 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+app.get('/', (req, res) => {
+  res.json({
+    message: 'Welcome to the MASAKIO API',
+    cloudinary: cloudinary.config().cloud_name ? 'Configured' : 'Not Configured',
+  });
+});
+
 // GET
 app.get('/wishlist', (req, res) => {
   db.query(`
