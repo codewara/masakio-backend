@@ -1,20 +1,21 @@
-require('dotenv').config();
+require('dotenv').config(); //Load environment variables from .env file
 
-const cloudinary = require('./cloudinary');
-const express = require('express');
-const cors = require('cors');
-const db = require('./db');
+const cloudinary = require('./cloudinary'); // inisialisasi Cloudinary
+const express = require('express'); // Inisialisasi Express.js
+const cors = require('cors'); // Inisialisasi CORS untuk mengizinkan permintaan lintas domain
+const db = require('./db'); // Inisialisasi koneksi database MySQL
 
-const PORT = process.env.DB_PORT;
+const PORT = process.env.DB_PORT; // Port untuk server Express.js, port diambil dari variabel .env
 
-const app = express();
+const app = express(); //
 app.use(cors());
 app.use(express.json());
 
-app.get('/', (req, res) => res.send('Welcome to the Recipe API'));
+app.get('/', (req, res) => res.send('Welcome to the Recipe API')); // Endpoint utama untuk menguji server
 
-app.use('/auth', require('./routes/auth'));
-app.use('/wishlist', require('./routes/wishlist'));
+app.use('/auth', require('./routes/auth'));  // Endpoint untuk otentikasi pengguna
+app.use('/wishlist', require('./routes/wishlist')); // Endpoint untuk daftar keinginan resep
+app.use('/recipe', require('./routes/detail_recipe')); // Endpoint untuk detail resep
 
 app.listen(PORT, () => {
   db.getConnection((err) => {
