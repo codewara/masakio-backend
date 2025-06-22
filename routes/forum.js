@@ -25,9 +25,9 @@ router.get('/:id', (req, res) => {
         JOIN user u ON d.id_user = u.id_user
         WHERE d.id_discuss = ?
     `, [id], (err, results) => {
+        result =  results[0];
         if (err) return res.status(500).json({ error: err.message });
-        result.thread =  results[0];
-        if (!result.thread) return res.status(404).json({ error: 'Discussion not found' });
+        if (!result) return res.status(404).json({ error: 'Discussion not found' });
 
         db.query(`
             SELECT d2.id_discuss, u2.nama_user, u2.foto, d2.gambar, d2.caption, d2.timestamp, d2.jumlah_like, COUNT(d.reply_to) AS jumlah_reply
