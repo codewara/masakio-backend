@@ -160,7 +160,6 @@ router.get('/filter', (req, res) => {
             resep.jumlah_view AS total_views, -- Jumlah kali resep dilihat
             resep.thumbnail AS gambar_resep,  -- Gambar thumbnail resep
             resep.id_kategori,              -- ID kategori resep
-            resep.thumbnail,                -- Thumbnail resep
             
             -- Nama penulis resep dari tabel user
             user.nama_user AS nama_penulis,
@@ -298,12 +297,11 @@ router.get('/filter', (req, res) => {
             id_resep: resep.id_resep,           // ID resep
             nama_resep: resep.nama_resep,       // Nama resep
             total_views: resep.total_views,     // Jumlah view
-            gambar_resep: resep.gambar_resep,   // URL gambar resep
+            thumbnail: resep.gambar_resep,   // URL gambar resep
             nama_penulis: resep.nama_penulis,   // Nama pembuat resep
             nama_kategori: resep.nama_kategori, // Kategori resep
             rating_rata_rata: resep.rating_rata_rata, // Rating rata-rata
-            total_review: resep.total_review,    // Jumlah review
-            thumbnail: resep.thumbnail // Thumbnail resep
+            total_review: resep.total_review   // Jumlah review
         }));
         
         // Kirim hasil dalam format JSON sebagai respons
