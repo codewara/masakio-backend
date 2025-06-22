@@ -106,19 +106,18 @@ router.post('/add', (req, res) => {
     db.query('SELECT * FROM review WHERE id_user = ? AND id_resep = ?', 
     [id_user, id_resep], (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
-        
-        // Jika user sudah pernah memberikan review, update review lama
+          // Jika user sudah pernah memberikan review, update review lama
         if (results.length > 0) {
-            db.query('UPDATE review SET rating = ?, komentar = ?, updated_at = NOW() WHERE id_user = ? AND id_resep = ?',
+            db.query('UPDATE review SET rating = ?, komentar = ? WHERE id_user = ? AND id_resep = ?',
             [rating, komentar || null, id_user, id_resep], (err, results) => {
                 if (err) return res.status(500).json({ error: err.message });
                 
-                res.status(200).json({ message: 'Review berhasil diperbarui', id_review: results[0].id_review });
+                res.status(200).json({ message: 'Review berhasil diperbarui' });
             });
         } 
         // Jika belum pernah, buat review baru
         else {
-            db.query('INSERT INTO review (id_user, id_resep, rating, komentar, created_at) VALUES (?, ?, ?, ?, NOW())',
+            db.query('INSERT INTO review (id_user, id_resep, rating, komentar) VALUES (?, ?, ?, ?)',
             [id_user, id_resep, rating, komentar || null], (err, results) => {
                 if (err) return res.status(500).json({ error: err.message });
                 

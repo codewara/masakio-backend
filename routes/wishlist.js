@@ -18,6 +18,20 @@ router.get('/:id', (req, res) => {
     });
 });
 
+// GET bookmark status untuk resep tertentu
+router.get('/check', (req, res) => {
+    const { user_id, recipe_id } = req.query;
+    
+    if (!user_id || !recipe_id) {
+        return res.status(400).json({ error: 'user_id and recipe_id are required' });
+    }
+    
+    db.query('SELECT * FROM wishlist WHERE id_user = ? AND id_resep = ?', [user_id, recipe_id], (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ is_bookmarked: results.length > 0 });
+    });
+});
+
 // POST
 router.post('/add', (req, res) => {
     const {user_id, recipe_id} = req.body;

@@ -27,6 +27,7 @@ Fungsi: Endpoint untuk mendapatkan daftar tag yang terkait dengan resep
 router.get('/basic/:id', (req, res) => {
     // Mengambil ID resep dari parameter URL
     const recipeId = req.params.id;
+    const userId = req.query.user_id; // Optional parameter untuk check bookmark status
     
     // Menjalankan query SQL untuk mengambil data resep dengan join ke tabel terkait
     db.query(`
@@ -56,14 +57,24 @@ router.get('/basic/:id', (req, res) => {
             nutrisi.karbohidrat,      -- Kandungan karbohidrat dalam gram
             nutrisi.protein,          -- Kandungan protein dalam gram
             nutrisi.lemak,            -- Kandungan lemak dalam gram
-            nutrisi.serat             -- Kandungan serat dalam gram
+            nutrisi.serat,            -- Kandungan serat dalam gram
+            
+            -- Total durasi dari semua prosedur
+            COALESCE((SELECT SUM(durasi) FROM prosedur WHERE prosedur.id_resep = resep.id_resep), 0) AS total_durasi,
+            
+            -- Estimasi harga total (misalnya Rp 2000 per bahan)
+            COALESCE((SELECT COUNT(*) * 2000 FROM bahan WHERE bahan.id_resep = resep.id_resep), 0) AS estimasi_harga,
+            
+            -- Bookmark status (jika user_id tersedia)
+            ${userId ? 'CASE WHEN wishlist.id_wishlist IS NOT NULL THEN 1 ELSE 0 END AS is_bookmarked' : '0 AS is_bookmarked'}
             
         FROM resep                    -- Tabel utama resep
         LEFT JOIN user ON resep.id_user = user.id_user -- Join dengan tabel user
         LEFT JOIN kategori ON resep.id_kategori = kategori.id_kategori -- Join dengan tabel kategori
         LEFT JOIN nutrisi ON resep.id_resep = nutrisi.id_resep -- Join dengan tabel nutrisi
+        ${userId ? 'LEFT JOIN wishlist ON resep.id_resep = wishlist.id_resep AND wishlist.id_user = ?' : ''}
         WHERE resep.id_resep = ?      -- Filter berdasarkan ID resep
-    `, [recipeId], (err, results) => {
+    `, userId ? [userId, recipeId] : [recipeId], (err, results) => {
         // Jika terjadi error database, kirim respons error 500
         if (err) return res.status(500).json({ error: err.message });
         // Jika resep tidak ditemukan, kirim respons error 404
