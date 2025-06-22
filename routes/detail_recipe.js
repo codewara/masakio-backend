@@ -359,5 +359,281 @@ router.get('/:id', (req, res) => {
     });
 });
 
+
+// Endpoint untuk menambahkan resep baru
+router.post('/create', (req, res) => {
+    // Menambahkan log untuk debugging
+    console.log('Request received at /recipe/create');
+    console.log('Request body:', req.body);
+    
+    // Memulai transaksi untuk memastikan semua data tersimpan secara konsisten
+    db.getConnection((err, connection) => {
+        if (err) return res.status(500).json({ error: 'Database connection error' });
+        
+        connection.beginTransaction(err => {
+            if (err) {
+                connection.release();
+                return res.status(500).json({ error: 'Transaction start error' });
+            }
+            
+            // Data resep utama dari request body
+            const { 
+                id_user, 
+                nama_resep, 
+                id_kategori, 
+                deskripsi, 
+                porsi,
+                video,
+                thumbnail,
+                nutrisi,
+                alat,
+                bahan,
+                prosedur,
+                tag
+            } = req.body;
+            
+            // Validasi data minimal yang diperlukan
+            if (!id_user || !nama_resep || !id_kategori || !deskripsi || !porsi) {
+                connection.rollback(() => connection.release());
+                return res.status(400).json({ error: 'Data resep tidak lengkap' });
+            }
+            
+            // 1. Menyimpan data utama resep
+            const recipeQuery = `
+                INSERT INTO resep (
+                    id_user, nama_resep, id_kategori, deskripsi, 
+                    porsi, video, thumbnail, jumlah_like, jumlah_view
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `;
+            
+            connection.query(
+                recipeQuery, 
+                [id_user, nama_resep, id_kategori, deskripsi, porsi, video || null, thumbnail || null, 0, 0],
+                (err, recipeResult) => {
+                    if (err) {
+                        connection.rollback(() => connection.release());
+                        return res.status(500).json({ error: 'Error menyimpan resep: ' + err.message });
+                    }
+                    
+                    // Mendapatkan ID resep yang baru dibuat
+                    const recipeId = recipeResult.insertId;
+                    
+                    // 2. Menyimpan data nutrisi jika ada
+                    if (nutrisi && Object.keys(nutrisi).length > 0) {
+                        const nutrisiQuery = `
+                            INSERT INTO nutrisi (
+                                id_resep, karbohidrat, protein, lemak, serat
+                            ) VALUES (?, ?, ?, ?, ?)
+                        `;
+                        
+                        connection.query(
+                            nutrisiQuery,
+                            [recipeId, nutrisi.karbohidrat || 0, nutrisi.protein || 0, 
+                             nutrisi.lemak || 0, nutrisi.serat || 0],
+                            (err) => {
+                                if (err) {
+                                    connection.rollback(() => connection.release());
+                                    return res.status(500).json({ 
+                                        error: 'Error menyimpan nutrisi: ' + err.message 
+                                    });
+                                }
+                                
+                                // Proses berlanjut ke penyimpanan alat
+                                saveAlat();
+                            }
+                        );
+                    } else {
+                        // Langsung lanjut ke penyimpanan alat jika tidak ada data nutrisi
+                        saveAlat();
+                    }
+                    
+                    // 3. Menyimpan daftar alat
+                    function saveAlat() {
+                        if (alat && alat.length > 0) {
+                            // Menyiapkan query dan values untuk batch insert
+                            const alatQuery = `
+                                INSERT INTO alat (id_resep, nama_alat, jumlah) 
+                                VALUES ?
+                            `;
+                            
+                            const alatValues = alat.map(item => [
+                                recipeId, 
+                                item.nama_alat,
+                                item.jumlah
+                            ]);
+                            
+                            connection.query(alatQuery, [alatValues], (err) => {
+                                if (err) {
+                                    connection.rollback(() => connection.release());
+                                    return res.status(500).json({ 
+                                        error: 'Error menyimpan alat: ' + err.message 
+                                    });
+                                }
+                                
+                                // Proses berlanjut ke penyimpanan bahan
+                                saveBahan();
+                            });
+                        } else {
+                            // Langsung lanjut ke penyimpanan bahan jika tidak ada alat
+                            saveBahan();
+                        }
+                    }
+                    
+                    // 4. Menyimpan daftar bahan
+                    function saveBahan() {
+                        if (bahan && bahan.length > 0) {
+                            // Menyiapkan query dan values untuk batch insert
+                            const bahanQuery = `
+                                INSERT INTO bahan (id_resep, nama_bahan, jumlah, id_satuan) 
+                                VALUES ?
+                            `;
+                            
+                            const bahanValues = bahan.map(item => [
+                                recipeId, 
+                                item.nama_bahan,
+                                item.jumlah,
+                                item.id_satuan
+                            ]);
+                            
+                            connection.query(bahanQuery, [bahanValues], (err) => {
+                                if (err) {
+                                    connection.rollback(() => connection.release());
+                                    return res.status(500).json({ 
+                                        error: 'Error menyimpan bahan: ' + err.message 
+                                    });
+                                }
+                                
+                                // Proses berlanjut ke penyimpanan prosedur
+                                saveProsedur();
+                            });
+                        } else {
+                            // Langsung lanjut ke penyimpanan prosedur jika tidak ada bahan
+                            saveProsedur();
+                        }
+                    }
+                    
+                    // 5. Menyimpan daftar prosedur dan langkah-langkah
+                    function saveProsedur() {
+                        if (prosedur && prosedur.length > 0) {
+                            // Gunakan Promise untuk menangani penyimpanan prosedur dan langkah secara berurutan
+                            const promises = prosedur.map((proc, index) => {
+                                return new Promise((resolve, reject) => {
+                                    // Menyimpan data prosedur
+                                    const prosedurQuery = `
+                                        INSERT INTO prosedur (id_resep, nama_prosedur, urutan, durasi) 
+                                        VALUES (?, ?, ?, ?)
+                                    `;
+                                    
+                                    connection.query(
+                                        prosedurQuery,
+                                        [recipeId, proc.nama_prosedur, index + 1, proc.durasi_menit || 0],
+                                        (err, prosedurResult) => {
+                                            if (err) {
+                                                return reject(err);
+                                            }
+                                            
+                                            const prosedurId = prosedurResult.insertId;
+                                            
+                                            // Jika prosedur ini tidak memiliki langkah, selesai
+                                            if (!proc.langkah || proc.langkah.length === 0) {
+                                                return resolve();
+                                            }
+                                            
+                                            // Menyimpan langkah-langkah untuk prosedur ini
+                                            const langkahQuery = `
+                                                INSERT INTO langkah (id_prosedur, nama_langkah, urutan) 
+                                                VALUES ?
+                                            `;
+                                            
+                                            const langkahValues = proc.langkah.map((langkah, langkahIndex) => [
+                                                prosedurId,
+                                                langkah.nama_langkah,
+                                                langkahIndex + 1
+                                            ]);
+                                            
+                                            connection.query(langkahQuery, [langkahValues], (err) => {
+                                                if (err) {
+                                                    return reject(err);
+                                                }
+                                                resolve();
+                                            });
+                                        }
+                                    );
+                                });
+                            });
+                            
+                            // Menjalankan semua promise untuk penyimpanan prosedur
+                            Promise.all(promises)
+                                .then(() => {
+                                    // Berlanjut ke penyimpanan tag
+                                    saveTag();
+                                })
+                                .catch(err => {
+                                    connection.rollback(() => connection.release());
+                                    res.status(500).json({ 
+                                        error: 'Error menyimpan prosedur: ' + err.message 
+                                    });
+                                });
+                        } else {
+                            // Jika tidak ada prosedur, langsung lanjut ke penyimpanan tag
+                            saveTag();
+                        }
+                    }
+                    
+                    // 6. Menyimpan daftar tag
+                    function saveTag() {
+                        if (tag && tag.length > 0) {
+                            // Menyiapkan query dan values untuk batch insert
+                            const tagQuery = `
+                                INSERT INTO tag (id_resep, nama_tag) 
+                                VALUES ?
+                            `;
+                            
+                            const tagValues = tag.map(item => [
+                                recipeId, 
+                                item.nama_tag
+                            ]);
+                            
+                            connection.query(tagQuery, [tagValues], (err) => {
+                                if (err) {
+                                    connection.rollback(() => connection.release());
+                                    return res.status(500).json({ 
+                                        error: 'Error menyimpan tag: ' + err.message 
+                                    });
+                                }
+                                
+                                // Semua data tersimpan, commit transaksi
+                                finalizeCreate();
+                            });
+                        } else {
+                            // Langsung finalisasi jika tidak ada tag
+                            finalizeCreate();
+                        }
+                    }
+                    
+                    // Finalisasi - commit transaksi
+                    function finalizeCreate() {
+                        connection.commit(err => {
+                            if (err) {
+                                connection.rollback(() => connection.release());
+                                return res.status(500).json({ 
+                                    error: 'Error saat commit transaksi: ' + err.message 
+                                });
+                            }
+                            
+                            connection.release();
+                            res.status(201).json({
+                                success: true,
+                                message: 'Resep berhasil disimpan',
+                                id_resep: recipeId
+                            });
+                        });
+                    }
+                }
+            );
+        });
+    });
+});
+
 // Mengekspor router agar dapat digunakan di index.js
 module.exports = router;
