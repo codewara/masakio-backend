@@ -126,125 +126,189 @@ router.get('/user/:user_id', (req, res) => {
 });
 
 
+// Endpoint untuk memfilter resep berdasarkan kategori, bahan yang diinginkan, dan bahan yang tidak diinginkan
 router.get('/filter', (req, res) => {
-    // Mengambil parameter filter dari query URL
+    // Mengambil dan memparse parameter category_id dari query URL, jika tidak ada maka gunakan null
     const categoryId = req.query.category_id ? parseInt(req.query.category_id) : null;
+    
+    // Mengambil parameter include dari query URL, memisahkan berdasarkan koma, dan mengubah setiap bahan menjadi lowercase untuk case-insensitive search
     const includeBahan = req.query.include ? 
         req.query.include.split(',').map(item => item.trim().toLowerCase()) : [];
+    
+    // Mengambil parameter exclude dari query URL dengan cara yang sama seperti include
     const excludeBahan = req.query.exclude ? 
         req.query.exclude.split(',').map(item => item.trim().toLowerCase()) : [];
     
+    // Mencatat parameter filter yang digunakan ke console untuk debugging
     console.log('Filter Parameters:');
     console.log('- Category ID:', categoryId);
     console.log('- Include Bahan:', includeBahan);
     console.log('- Exclude Bahan:', excludeBahan);
     
-    // Step 1: Ambil semua data resep dengan bahan dan kategori
-    const sql = `
+    // Menyiapkan array untuk menyimpan parameter query yang akan digunakan dalam prepared statement
+    let queryParams = [];
+    // Array untuk menyimpan kondisi WHERE yang akan digunakan dalam query
+    let whereConditions = [];
+    // Array untuk menyimpan kondisi HAVING yang akan digunakan dalam query
+    let havingConditions = [];
+    
+    // Memulai membuat query SQL dengan SELECT statement dasar
+    let sql = `
         SELECT 
-            resep.id_resep,
-            resep.nama_resep,
-            resep.jumlah_view AS total_views,
-            resep.thumbnail AS gambar_resep,
-            resep.id_kategori,
+            resep.id_resep,                 -- ID resep yang unik
+            resep.nama_resep,               -- Nama resep
+            resep.jumlah_view AS total_views, -- Jumlah kali resep dilihat
+            resep.thumbnail AS gambar_resep,  -- Gambar thumbnail resep
+            resep.id_kategori,              -- ID kategori resep
             
-            -- Nama penulis resep
+            -- Nama penulis resep dari tabel user
             user.nama_user AS nama_penulis,
             
-            -- Nama kategori
+            -- Nama kategori dari tabel kategori
             kategori.kategori AS nama_kategori,
             
-            -- Informasi bahan (GROUP_CONCAT untuk mendapatkan semua bahan dalam satu row)
-            GROUP_CONCAT(DISTINCT bahan.nama_bahan) AS daftar_bahan,
-            
-            -- Rating dengan handling NULL
+            -- Menghitung rating rata-rata, jika tidak ada review maka rating = 0
             CASE 
                 WHEN COUNT(DISTINCT review.id_review) = 0 THEN 0.0
                 ELSE ROUND(AVG(review.rating), 2)
             END AS rating_rata_rata,
             
-            -- Total review
+            -- Menghitung jumlah total review untuk resep
             COUNT(DISTINCT review.id_review) AS total_review
-            
+    `;
+    
+    // Jika ada parameter include (bahan yang diinginkan), tambahkan kolom untuk menghitung jumlah bahan yang cocok
+    if (includeBahan.length > 0) {
+        sql += `,
+            -- Hitung berapa bahan yang cocok dengan kriteria include
+            COUNT(DISTINCT CASE 
+                -- Mengecek apakah nama_bahan (setelah ditrim dan lowercase) ada dalam daftar bahan yang diinginkan
+                WHEN LOWER(TRIM(bahan.nama_bahan)) IN (${includeBahan.map(() => '?').join(',')}) 
+                -- Jika cocok, hitung id_bahan tersebut
+                THEN bahan.id_bahan 
+                -- Jika tidak cocok, berikan NULL (tidak dihitung)
+                ELSE NULL 
+            END) AS matched_include_count`;
+        
+        // Menambahkan nilai bahan yang diinginkan ke parameter query
+        queryParams.push(...includeBahan);
+    }
+    
+    // Menambahkan klausa FROM dan JOIN untuk menghubungkan tabel-tabel yang diperlukan
+    sql += `
         FROM resep
+        -- Join dengan tabel user untuk mendapatkan info penulis
         INNER JOIN user ON resep.id_user = user.id_user
+        -- Join dengan tabel kategori untuk mendapatkan nama kategori
         INNER JOIN kategori ON resep.id_kategori = kategori.id_kategori
+        -- Left join dengan tabel bahan untuk memfilter berdasarkan bahan
         LEFT JOIN bahan ON resep.id_resep = bahan.id_resep
+        -- Left join dengan tabel review untuk menghitung rating dan jumlah review
         LEFT JOIN review ON resep.id_resep = review.id_resep
+    `;
+    
+    // Mulai membangun kondisi WHERE
+    
+    // 1. Filter berdasarkan kategori jika category_id disediakan
+    if (categoryId !== null) {
+        // Tambahkan kondisi untuk memfilter berdasarkan id_kategori
+        whereConditions.push('resep.id_kategori = ?');
+        // Tambahkan nilai category_id ke parameter query
+        queryParams.push(categoryId);
+    }
+    
+    // 2. Filter untuk mengecualikan resep dengan bahan yang tidak diinginkan
+    if (excludeBahan.length > 0) {
+        // Gunakan subquery NOT EXISTS untuk memastikan tidak ada bahan yang tidak diinginkan dalam resep
+        const excludeSubquery = `
+            NOT EXISTS (
+                -- Subquery yang mencari bahan yang tidak diinginkan dalam resep
+                SELECT 1 FROM bahan exclude_check 
+                WHERE exclude_check.id_resep = resep.id_resep 
+                -- Mengecek apakah nama_bahan (setelah ditrim dan lowercase) ada dalam daftar bahan yang tidak diinginkan
+                AND LOWER(TRIM(exclude_check.nama_bahan)) IN (${excludeBahan.map(() => '?').join(',')})
+            )`;
+        // Tambahkan subquery ke kondisi WHERE
+        whereConditions.push(excludeSubquery);
+        // Tambahkan nilai bahan yang tidak diinginkan ke parameter query
+        queryParams.push(...excludeBahan);
+    }
+    
+    // Tambahkan klausa WHERE ke query jika ada kondisi WHERE yang ditetapkan
+    if (whereConditions.length > 0) {
+        sql += ' WHERE ' + whereConditions.join(' AND ');
+    }
+    
+    // Tambahkan klausa GROUP BY untuk mengelompokkan hasil berdasarkan resep
+    sql += `
         GROUP BY 
-            resep.id_resep,
-            resep.nama_resep, 
+            resep.id_resep,             -- Grouping berdasarkan id resep
+            resep.nama_resep,           -- dan atribut resep lainnya
             resep.jumlah_view,
             resep.thumbnail,
             resep.id_kategori,
-            user.nama_user,
-            kategori.kategori
-        ORDER BY resep.id_resep`;
+            user.nama_user,             -- serta nama penulis
+            kategori.kategori           -- dan nama kategori
+    `;
     
-    db.query(sql, (err, results) => {
+    // 3. Filter untuk memastikan resep mengandung semua bahan yang diinginkan
+    if (includeBahan.length > 0) {
+        // Kondisi HAVING untuk memastikan jumlah bahan yang cocok = jumlah bahan yang diinginkan
+        // Ini memastikan semua bahan yang diinginkan ada dalam resep
+        havingConditions.push('matched_include_count = ?');
+        // Tambahkan jumlah bahan yang diinginkan ke parameter query
+        queryParams.push(includeBahan.length);
+    }
+    
+    // Tambahkan klausa HAVING ke query jika ada kondisi HAVING yang ditetapkan
+    if (havingConditions.length > 0) {
+        sql += ' HAVING ' + havingConditions.join(' AND ');
+    }
+    
+    // Tambahkan klausa ORDER BY untuk mengurutkan hasil
+    // Urutkan berdasarkan rating tertinggi, lalu jumlah review, dan terakhir jumlah view
+    sql += ' ORDER BY rating_rata_rata DESC, total_review DESC, resep.jumlah_view DESC';
+    
+    // Cetak query SQL dan parameter yang digunakan untuk debugging
+    console.log('Generated SQL:', sql);
+    console.log('Query Parameters:', queryParams);
+    
+    // Eksekusi query dengan parameter yang telah disiapkan
+    db.query(sql, queryParams, (err, results) => {
+        // Handling error database
         if (err) {
+            // Catat error ke console untuk debugging
             console.error('Database Error:', err.message);
-            return res.status(500).json({ error: err.message });
+            console.error('Failed SQL:', sql);
+            console.error('Failed Parameters:', queryParams);
+            // Kirim respons error dengan detail tambahan jika dalam mode development
+            return res.status(500).json({ 
+                error: err.message,
+                sql_debug: process.env.NODE_ENV === 'development' ? sql : undefined 
+            });
         }
         
-        console.log(`Retrieved ${results.length} recipes from database`);
+        // Log jumlah resep yang ditemukan
+        console.log(`Query executed successfully. Found ${results.length} recipes.`);
         
-        // Step 2: Filter data di JavaScript
-        const filteredResults = results.filter(resep => {
-            // Konversi daftar_bahan menjadi array (lowercase untuk comparison)
-            const bahanArray = resep.daftar_bahan ? 
-                resep.daftar_bahan.toLowerCase().split(',').map(item => item.trim()) : [];
-            
-            // Filter 1: Kategori (jika ada)
-            if (categoryId !== null && resep.id_kategori !== categoryId) {
-                return false;
-            }
-            
-            // Filter 2: Include bahan (semua bahan yang diminta harus ada)
-            if (includeBahan.length > 0) {
-                const hasAllIncludedIngredients = includeBahan.every(requiredBahan => 
-                    bahanArray.some(actualBahan => actualBahan.includes(requiredBahan))
-                );
-                
-                if (!hasAllIncludedIngredients) {
-                    return false;
-                }
-            }
-            
-            // Filter 3: Exclude bahan (tidak boleh ada bahan yang dikecualikan)
-            if (excludeBahan.length > 0) {
-                const hasExcludedIngredients = excludeBahan.some(excludedBahan => 
-                    bahanArray.some(actualBahan => actualBahan.includes(excludedBahan))
-                );
-                
-                if (hasExcludedIngredients) {
-                    return false;
-                }
-            }
-            
-            return true; // Lolos semua filter
-        });
-        
-        console.log(`After filtering: ${filteredResults.length} recipes match criteria`);
-        
-        // Step 3: Format hasil untuk response (sesuai format card resep)
-        const formattedResults = filteredResults.map(resep => ({
-            id_resep: resep.id_resep,
-            nama_resep: resep.nama_resep,
-            total_views: resep.total_views,
-            gambar_resep: resep.gambar_resep,
-            nama_penulis: resep.nama_penulis,
-            nama_kategori: resep.nama_kategori,
-            rating_rata_rata: resep.rating_rata_rata,
-            total_review: resep.total_review,
-            // Tambahan informasi untuk debugging
-            daftar_bahan: resep.daftar_bahan
+        // Format hasil query sebelum dikirim sebagai respons
+        // Ini juga menghilangkan kolom 'matched_include_count' yang hanya digunakan untuk filtering
+        const formattedResults = results.map(resep => ({
+            id_resep: resep.id_resep,           // ID resep
+            nama_resep: resep.nama_resep,       // Nama resep
+            total_views: resep.total_views,     // Jumlah view
+            gambar_resep: resep.gambar_resep,   // URL gambar resep
+            nama_penulis: resep.nama_penulis,   // Nama pembuat resep
+            nama_kategori: resep.nama_kategori, // Kategori resep
+            rating_rata_rata: resep.rating_rata_rata, // Rating rata-rata
+            total_review: resep.total_review    // Jumlah review
         }));
         
-        // Step 4: Return hasil
+        // Kirim hasil dalam format JSON sebagai respons
         res.json(formattedResults);
     });
 });
+
 
 
 
