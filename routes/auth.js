@@ -25,11 +25,18 @@ router.post('/register', (req, res) => {
 router.post('/login', (req, res) => {
     const { email, password } = req.body;
     const hashpw = crypto.createHash('sha256').update(password).digest('hex');
-
+    
+    // Langsung cek apakah email dan password valid
     db.query('SELECT * FROM user WHERE email = ? AND password = ?',
     [email, hashpw], (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
-        if (results.length === 0) return res.status(401).json({ error: 'Email atau password salah' });
+        
+        // Jika tidak ditemukan, berarti email atau password salah
+        if (results.length === 0) {
+            return res.status(401).json({ error: 'Email atau password salah' });
+        }
+        
+        // Jika email dan password benar
         res.status(200).json(results[0]);
     });
 });
