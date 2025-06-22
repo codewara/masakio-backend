@@ -21,7 +21,7 @@ router.post('/add', (req, res) => {
     if (!id_user || !gambar || !caption) {
         return res.status(400).json({ error: 'Missing required fields' });
     }
-    db.query('INSERT INTO discussion (id_user, gambar, caption, timestamp) VALUES (?, ?, ?, NOW())',
+    db.query('INSERT INTO discussion (id_user, gambar, caption, timestamp, jumlah_like, reply_to) VALUES (?, ?, ?, NOW(), 0, NULL)',
     [id_user, gambar, caption], (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
         res.status(201).json({ message: 'Discussion added successfully', id_discuss: results.insertId });
