@@ -23,6 +23,7 @@ Endpoint : https://masakio.up.railway.app/recipe/tag/{id_resep}
 Fungsi: Endpoint untuk mendapatkan daftar tag yang terkait dengan resep
 */ 
 
+/*
 // 1. Endpoint untuk mendapatkan informasi dasar resep, user, kategori, dan nutrisi
 router.get('/basic/:id', (req, res) => {
     // Mengambil ID resep dari parameter URL
@@ -202,6 +203,8 @@ router.get('/tag/:id', (req, res) => {
         res.json(results);
     });
 });
+
+*/
 
 // Endpoint untuk mendapatkan semua informasi resep dalam satu panggilan API
 router.get('/:id', (req, res) => {
