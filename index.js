@@ -14,6 +14,7 @@ app.use(express.json());
 app.get('/', (req, res) => res.send('Welcome to the Recipe API'));
 
 app.use('/auth', require('./routes/auth'));
+app.use('/wishlist', require('./routes/wishlist'));
 
 app.listen(PORT, () => {
   db.getConnection((err) => {
