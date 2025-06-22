@@ -16,13 +16,13 @@ const db = require('../db');
  *    - Mengambil resep yang dibuat oleh pengguna tertentu
  *    - (id_resep, nama_resep, jumlah_view, thumbnail, nama_penulis, rating, jumlah_review, tanggal_dibuat)
  * 
- * 3. GET /card_recipe/count/:user_id
- *    - Menghitung jumlah resep yang dibuat oleh pengguna tertentu
- *    - (total_resep)
- * 
- * 4. GET /card_recipe/category/:category_id
- *    - Mengambil resep berdasarkan kategori tertentu
- *    - (id_resep, nama_resep, jumlah_view, thumbnail, nama_penulis, rating, jumlah_review)
+ * 3. GET /card_recipe/filter
+ *    - Memfilter resep berdasarkan kategori, bahan yang diinginkan, dan bahan yang tidak diinginkan
+ *    - Query params:
+ *      - category_id: ID kategori resep (opsional)
+ *      - include: Daftar bahan yang diinginkan, dipisahkan dengan koma (opsional)
+ *      - exclude: Daftar bahan yang tidak diinginkan, dipisahkan dengan koma (opsional)
+ *    - Returns: (id_resep, nama_resep, jumlah_view, thumbnail, nama_penulis, rating, jumlah_review)
  */
 
 // Endpoint untuk mendapatkan semua card recipe (tampilan kartu resep)
@@ -125,79 +125,128 @@ router.get('/user/:user_id', (req, res) => {
     });
 });
 
-// Endpoint untuk mendapatkan jumlah resep yang dibuat oleh user tertentu
-router.get('/count/:user_id', (req, res) => {
-    // Mengambil ID user dari parameter URL
-    const userId = req.params.user_id;
-    
-    // Validasi ID user
-    if (!userId || isNaN(userId)) {
-        return res.status(400).json({ error: 'ID user tidak valid' });
-    }
-    
-    // Menjalankan query SQL untuk menghitung jumlah resep milik user tertentu
-    db.query(`
-        SELECT COUNT(*) AS total_resep
-        FROM resep
-        WHERE id_user = ?
-    `, [userId], (err, results) => {
-        // Jika terjadi error database, kirim respons error 500
-        if (err) return res.status(500).json({ error: err.message });
-        
-        // Kirim hasil dalam format JSON
-        res.json({ total_resep: results[0].total_resep });
-    });
-});
 
-// Endpoint untuk mendapatkan card recipe berdasarkan kategori
-router.get('/category/:category_id', (req, res) => {
-    // Mengambil ID kategori dari parameter URL
-    const categoryId = req.params.category_id;
+router.get('/filter', (req, res) => {
+    // Mengambil parameter filter dari query URL
+    const categoryId = req.query.category_id ? parseInt(req.query.category_id) : null;
+    const includeBahan = req.query.include ? 
+        req.query.include.split(',').map(item => item.trim().toLowerCase()) : [];
+    const excludeBahan = req.query.exclude ? 
+        req.query.exclude.split(',').map(item => item.trim().toLowerCase()) : [];
     
-    // Validasi ID kategori
-    if (!categoryId || isNaN(categoryId)) {
-        return res.status(400).json({ error: 'ID kategori tidak valid' });
-    }
+    console.log('Filter Parameters:');
+    console.log('- Category ID:', categoryId);
+    console.log('- Include Bahan:', includeBahan);
+    console.log('- Exclude Bahan:', excludeBahan);
     
-    // Menjalankan query SQL untuk mendapatkan daftar resep berdasarkan kategori
-    db.query(`
+    // Step 1: Ambil semua data resep dengan bahan dan kategori
+    const sql = `
         SELECT 
-            resep.id_resep,             -- ID resep
-            resep.nama_resep,           -- Nama resep
-            resep.jumlah_view,          -- Jumlah dilihat
-            resep.thumbnail,            -- Foto/gambar resep
+            resep.id_resep,
+            resep.nama_resep,
+            resep.jumlah_view AS total_views,
+            resep.thumbnail AS gambar_resep,
+            resep.id_kategori,
             
             -- Nama penulis resep
             user.nama_user AS nama_penulis,
             
-            -- Rating dengan handling NULL (jika belum ada review)
+            -- Nama kategori
+            kategori.kategori AS nama_kategori,
+            
+            -- Informasi bahan (GROUP_CONCAT untuk mendapatkan semua bahan dalam satu row)
+            GROUP_CONCAT(DISTINCT bahan.nama_bahan) AS daftar_bahan,
+            
+            -- Rating dengan handling NULL
             CASE 
-                WHEN COUNT(review.id_review) = 0 THEN 0.0
+                WHEN COUNT(DISTINCT review.id_review) = 0 THEN 0.0
                 ELSE ROUND(AVG(review.rating), 2)
-            END AS rating,
+            END AS rating_rata_rata,
             
             -- Total review
-            COUNT(review.id_review) AS jumlah_review
-
+            COUNT(DISTINCT review.id_review) AS total_review
+            
         FROM resep
         INNER JOIN user ON resep.id_user = user.id_user
+        INNER JOIN kategori ON resep.id_kategori = kategori.id_kategori
+        LEFT JOIN bahan ON resep.id_resep = bahan.id_resep
         LEFT JOIN review ON resep.id_resep = review.id_resep
-        WHERE resep.id_kategori = ?     -- Filter berdasarkan ID kategori
         GROUP BY 
             resep.id_resep,
             resep.nama_resep, 
             resep.jumlah_view,
             resep.thumbnail,
-            user.nama_user
-        ORDER BY rating DESC, jumlah_review DESC, resep.jumlah_view DESC
-    `, [categoryId], (err, results) => {
-        // Jika terjadi error database, kirim respons error 500
-        if (err) return res.status(500).json({ error: err.message });
+            resep.id_kategori,
+            user.nama_user,
+            kategori.kategori
+        ORDER BY resep.id_resep`;
+    
+    db.query(sql, (err, results) => {
+        if (err) {
+            console.error('Database Error:', err.message);
+            return res.status(500).json({ error: err.message });
+        }
         
-        // Kirim hasil dalam format JSON
-        res.json(results);
+        console.log(`Retrieved ${results.length} recipes from database`);
+        
+        // Step 2: Filter data di JavaScript
+        const filteredResults = results.filter(resep => {
+            // Konversi daftar_bahan menjadi array (lowercase untuk comparison)
+            const bahanArray = resep.daftar_bahan ? 
+                resep.daftar_bahan.toLowerCase().split(',').map(item => item.trim()) : [];
+            
+            // Filter 1: Kategori (jika ada)
+            if (categoryId !== null && resep.id_kategori !== categoryId) {
+                return false;
+            }
+            
+            // Filter 2: Include bahan (semua bahan yang diminta harus ada)
+            if (includeBahan.length > 0) {
+                const hasAllIncludedIngredients = includeBahan.every(requiredBahan => 
+                    bahanArray.some(actualBahan => actualBahan.includes(requiredBahan))
+                );
+                
+                if (!hasAllIncludedIngredients) {
+                    return false;
+                }
+            }
+            
+            // Filter 3: Exclude bahan (tidak boleh ada bahan yang dikecualikan)
+            if (excludeBahan.length > 0) {
+                const hasExcludedIngredients = excludeBahan.some(excludedBahan => 
+                    bahanArray.some(actualBahan => actualBahan.includes(excludedBahan))
+                );
+                
+                if (hasExcludedIngredients) {
+                    return false;
+                }
+            }
+            
+            return true; // Lolos semua filter
+        });
+        
+        console.log(`After filtering: ${filteredResults.length} recipes match criteria`);
+        
+        // Step 3: Format hasil untuk response (sesuai format card resep)
+        const formattedResults = filteredResults.map(resep => ({
+            id_resep: resep.id_resep,
+            nama_resep: resep.nama_resep,
+            total_views: resep.total_views,
+            gambar_resep: resep.gambar_resep,
+            nama_penulis: resep.nama_penulis,
+            nama_kategori: resep.nama_kategori,
+            rating_rata_rata: resep.rating_rata_rata,
+            total_review: resep.total_review,
+            // Tambahan informasi untuk debugging
+            daftar_bahan: resep.daftar_bahan
+        }));
+        
+        // Step 4: Return hasil
+        res.json(formattedResults);
     });
 });
+
+
 
 // Mengekspor router agar dapat digunakan di index.js
 module.exports = router;
