@@ -6,7 +6,7 @@ const db = require('./db'); // Inisialisasi koneksi database MySQL
 
 const PORT = process.env.DB_PORT; // Port untuk server Express.js, port diambil dari variabel .env
 
-const app = express(); //
+const app = express();
 app.use(cors());
 app.use(express.json());
 
