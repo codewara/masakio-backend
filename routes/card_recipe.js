@@ -160,6 +160,7 @@ router.get('/filter', (req, res) => {
             resep.jumlah_view AS total_views, -- Jumlah kali resep dilihat
             resep.thumbnail AS gambar_resep,  -- Gambar thumbnail resep
             resep.id_kategori,              -- ID kategori resep
+            resep.thumbnail,                -- Thumbnail resep
             
             -- Nama penulis resep dari tabel user
             user.nama_user AS nama_penulis,
