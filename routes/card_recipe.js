@@ -302,7 +302,8 @@ router.get('/filter', (req, res) => {
             nama_penulis: resep.nama_penulis,   // Nama pembuat resep
             nama_kategori: resep.nama_kategori, // Kategori resep
             rating_rata_rata: resep.rating_rata_rata, // Rating rata-rata
-            total_review: resep.total_review    // Jumlah review
+            total_review: resep.total_review,    // Jumlah review
+            thumbnail: resep.thumbnail // Thumbnail resep
         }));
         
         // Kirim hasil dalam format JSON sebagai respons
