@@ -16,6 +16,32 @@ router.get('/', (req, res) => {
     });
 });
 
+router.get('/:id', (req, res) => {
+    const id = req.params.id;
+    result = {};
+    db.query(`
+        SELECT d.id_discuss, u.nama_user, u.foto, d.gambar, d.caption, d.timestamp, d.jumlah_like
+        FROM discussion d
+        JOIN user u ON d.id_user = u.id_user
+        WHERE d.id_discuss = ?
+    `, [id], (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        result.thread =  results[0];
+        if (!result.thread) return res.status(404).json({ error: 'Discussion not found' });
+
+        db.query(`
+            SELECT d2.id_discuss, u2.nama_user, u2.foto, d2.gambar, d2.caption, d2.timestamp, d2.jumlah_like
+            FROM discussion d2
+            JOIN user u2 ON d2.id_user = u2.id_user
+            WHERE d2.reply_to = ?
+        `, [id], (err, replyResults) => {
+            if (err) return res.status(500).json({ error: err.message });
+            result.replies = replyResults;
+            res.json(result);
+        });
+    });
+});
+
 router.post('/add', (req, res) => {
     const { id_user, gambar, caption } = req.body;
     db.query('INSERT INTO discussion (id_user, gambar, caption, timestamp, jumlah_like, reply_to) VALUES (?, ?, ?, NOW(), 0, NULL)',
