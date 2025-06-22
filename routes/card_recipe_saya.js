@@ -96,45 +96,5 @@ router.get('/count/:user_id', (req, res) => {
     });
 });
 
-// Endpoint untuk mendapatkan statistik resep user
-router.get('/stats/:user_id', (req, res) => {
-    // Mengambil ID user dari parameter URL
-    const userId = req.params.user_id;
-    
-    // Validasi ID user
-    if (!userId || isNaN(userId)) {
-        return res.status(400).json({ error: 'ID user tidak valid' });
-    }
-    
-    // Menjalankan query SQL untuk mendapatkan statistik resep
-    db.query(`
-        SELECT 
-            COUNT(*) AS total_resep,
-            SUM(jumlah_view) AS total_view,
-            SUM(jumlah_like) AS total_like,
-            (SELECT COUNT(*) FROM review r 
-             JOIN resep rp ON r.id_resep = rp.id_resep 
-             WHERE rp.id_user = ?) AS total_review,
-            (SELECT ROUND(AVG(rating), 2) FROM review r 
-             JOIN resep rp ON r.id_resep = rp.id_resep 
-             WHERE rp.id_user = ?) AS rating_rata_rata
-        FROM resep
-        WHERE id_user = ?
-    `, [userId, userId, userId], (err, results) => {
-        // Jika terjadi error database, kirim respons error 500
-        if (err) return res.status(500).json({ error: err.message });
-        
-        // Pastikan nilai tidak null
-        const stats = results[0];
-        stats.rating_rata_rata = stats.rating_rata_rata || 0;
-        stats.total_view = stats.total_view || 0;
-        stats.total_like = stats.total_like || 0;
-        stats.total_review = stats.total_review || 0;
-        
-        // Kirim hasil dalam format JSON
-        res.json(stats);
-    });
-});
-
 // Mengekspor router agar dapat digunakan di index.js
 module.exports = router;

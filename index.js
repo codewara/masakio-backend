@@ -20,6 +20,7 @@ app.use('/card_recipe', require('./routes/card_recipe')); // Endpoint untuk tamp
 app.use('/card_recipe_saya', require('./routes/card_recipe_saya')); // Endpoint untuk tampilan card resep milik user tertentu
 app.use('/reviews', require('./routes/reviews')); // Endpoint untuk review resep
 app.use('/tips', require('./routes/tips')); // Endpoint untuk tips memasak
+app.use('/history', require('./routes/history')); // Endpoint untuk riwayat resep yang dilihat
 
 app.listen(PORT, () => {
   db.getConnection((err) => {
