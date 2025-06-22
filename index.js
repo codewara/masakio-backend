@@ -17,6 +17,7 @@ app.use('/auth', require('./routes/auth'));  // Endpoint untuk otentikasi penggu
 app.use('/wishlist', require('./routes/wishlist')); // Endpoint untuk daftar keinginan resep
 app.use('/recipe', require('./routes/detail_recipe')); // Endpoint untuk detail resep
 app.use('/card_recipe', require('./routes/card_recipe')); // Endpoint untuk tampilan card resep
+app.use('/card_recipe_saya', require('./routes/card_recipe_saya')); // Endpoint untuk tampilan card resep milik user tertentu
 
 app.listen(PORT, () => {
   db.getConnection((err) => {
