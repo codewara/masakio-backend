@@ -21,6 +21,7 @@ app.use('/diseases', require('./routes/diseases')); // Endpoint untuk penyakit
 app.use('/wishlist', require('./routes/wishlist')); // Endpoint untuk daftar keinginan resep
 app.use('/recipe', require('./routes/detail_recipe')); // Endpoint untuk detail resep
 app.use('/card_recipe', require('./routes/card_recipe')); // Endpoint untuk tampilan card resep (termasuk resep per user)
+app.use('/user', require('./routes/user')); // Endpoint untuk profil pengguna
 
 app.listen(PORT, () => {
   db.getConnection((err) => {
