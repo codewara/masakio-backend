@@ -224,6 +224,7 @@ router.get('/:id', (req, res) => {
             resep.porsi,              -- Jumlah porsi resep
             resep.jumlah_like,        -- Jumlah like dari pengguna
             resep.jumlah_view,        -- Jumlah kali dilihat
+            resep.thumbnail,        -- Foto/gambar resep
             
             -- Data pembuat (user)
             user.id_user,             -- ID unik user pembuat resep
