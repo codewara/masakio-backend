@@ -4,8 +4,10 @@ const router = express.Router();
 const db = require('../db');
 
 router.post('/register', (req, res) => {
-    const { username, email, password, birth_date } = req.body;
+    const { username, email, password, birth_date, diseases } = req.body; // Add diseases to request body
     const hashpw = crypto.createHash('sha256').update(password).digest('hex');
+
+    console.log('Diseases received:', diseases); // Log diseases data
 
     db.query('SELECT * FROM user WHERE email = ?', [email], (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -14,7 +16,17 @@ router.post('/register', (req, res) => {
         db.query('INSERT INTO user (nama_user, email, tanggal_lahir, created_at, password) VALUES (?, ?, ?, NOW(), ?)',
         [username, email, birth_date, hashpw], (err, results) => {
             if (err) return res.status(500).json({ error: err.message });
-            db.query('SELECT * FROM user WHERE id_user = ?', [results.insertId], (err, userResults) => {
+            const userId = results.insertId; // Get the inserted user ID
+
+            // Save diseases to riwayat_user table if provided
+            if (diseases && Array.isArray(diseases)) {
+                const diseaseValues = diseases.map(diseaseId => [userId, diseaseId]);
+                db.query('INSERT INTO riwayat_user (id_user, id_penyakit) VALUES ?', [diseaseValues], (err) => {
+                    if (err) return res.status(500).json({ error: err.message });
+                });
+            }
+
+            db.query('SELECT * FROM user WHERE id_user = ?', [userId], (err, userResults) => {
                 if (err) return res.status(500).json({ error: err.message });
                 res.status(201).json(userResults[0]);
             });
