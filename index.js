@@ -13,7 +13,7 @@ app.use(express.json());
 app.get('/', (req, res) => res.send('Welcome to the Recipe API')); // Endpoint utama untuk menguji server
 
 app.use('/auth', require('./routes/auth'));  // Endpoint untuk otentikasi pengguna
-app.use('/tips', require('./routes/card_tips')); // Endpoint untuk tips memasak
+app.use('/tips', require('./routes/tips_and_trik')); // Endpoint untuk tips memasak
 app.use('/forum', require('./routes/forum')); // Endpoint untuk forum diskusi
 app.use('/history', require('./routes/history')); // Endpoint untuk riwayat resep yang dilihat
 app.use('/reviews', require('./routes/reviews')); // Endpoint untuk review resep

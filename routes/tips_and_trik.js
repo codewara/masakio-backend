@@ -12,7 +12,7 @@ Fungsi : Mengambil semua tips memasak
          (id_tips, nama_uploader, judul, foto)
  */
 
-// Endpoint untuk mendapatkan semua tips memasak
+// Endpoint untuk mendapatkan semua tips memasak (dalam bentuk card)
 router.get('/all', (req, res) => {
     // Menjalankan query SQL untuk mendapatkan daftar tips
     db.query(`
