@@ -369,8 +369,7 @@ router.post('/create', (req, res) => {
     // Menambahkan log untuk debugging
     console.log('Request received at /recipe/create');
     console.log('Request body:', req.body);
-    
-    // Memulai transaksi untuk memastikan semua data tersimpan secara konsisten
+      // Memulai transaksi untuk memastikan semua data tersimpan secara konsisten
     db.getConnection((err, connection) => {
         if (err) return res.status(500).json({ error: 'Database connection error' });
         
@@ -379,6 +378,37 @@ router.post('/create', (req, res) => {
                 connection.release();
                 return res.status(500).json({ error: 'Transaction start error' });
             }
+            
+            // Handle multiple request formats:
+            // 1. Nested JSON in recipe field
+            // 2. Direct form fields
+            let recipeData = {};
+            
+            if (req.body.recipe) {
+                // Parse the recipe JSON if it exists
+                try {
+                    recipeData = JSON.parse(req.body.recipe);
+                    console.log('Parsed recipe data from recipe field:', recipeData);
+                } catch (e) {
+                    console.error('Error parsing recipe JSON:', e);
+                }
+            } else {
+                // Or use direct form fields
+                recipeData = req.body;
+                console.log('Using direct form fields for recipe data');
+            }
+            
+            // Parse any JSON strings in form fields
+            ['nutrisi', 'alat', 'bahan', 'prosedur', 'tag'].forEach(field => {
+                if (typeof recipeData[field] === 'string') {
+                    try {
+                        recipeData[field] = JSON.parse(recipeData[field]);
+                        console.log(`Parsed ${field} from string to object`);
+                    } catch (e) {
+                        console.error(`Error parsing ${field} as JSON:`, e);
+                    }
+                }
+            });
             
             // Data resep utama dari request body
             const { 
@@ -394,7 +424,7 @@ router.post('/create', (req, res) => {
                 bahan,
                 prosedur,
                 tag
-            } = req.body;
+            } = recipeData;
             
             // Validasi data minimal yang diperlukan
             if (!id_user || !nama_resep || !id_kategori || !deskripsi || !porsi) {
@@ -412,7 +442,7 @@ router.post('/create', (req, res) => {
             
             connection.query(
                 recipeQuery, 
-                [id_user, nama_resep, id_kategori, deskripsi, porsi, video || null, thumbnail || null, 0, 0],
+                [id_user, nama_resep, id_kategori, deskripsi, porsi, video || null, thumbnail || 'nasi_goreng.jpeg', 0, 0],
                 (err, recipeResult) => {
                     if (err) {
                         connection.rollback(() => connection.release());
