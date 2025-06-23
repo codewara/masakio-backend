@@ -3,12 +3,12 @@ const router = express.Router();
 const db = require('../db');
 
 // Get user profile (with diseases)
-router.get('/user/:userId', (req, res) => {
-    const { userId } = req.params;
+router.get('/:id', (req, res) => {
+    const { id } = req.params;
 
     // Get user data
     const userQuery = 'SELECT * FROM user WHERE id_user = ?';
-    db.query(userQuery, [userId], (err, userResults) => {
+    db.query(userQuery, [id], (err, userResults) => {
         if (err) return res.status(500).json({ error: err.message });
 
         if (userResults.length === 0) return res.status(404).json({ error: 'User not found' });
@@ -20,7 +20,7 @@ router.get('/user/:userId', (req, res) => {
             JOIN penyakit p ON ru.id_penyakit = p.id_penyakit
             WHERE ru.id_user = ?
         `;
-        db.query(diseasesQuery, [userId], (err, diseaseResults) => {
+        db.query(diseasesQuery, [id], (err, diseaseResults) => {
             if (err) return res.status(500).json({ error: err.message });
 
             // Combine user data with their disease history
@@ -33,8 +33,8 @@ router.get('/user/:userId', (req, res) => {
 });
 
 // Update user profile and diseases (PUT request)
-router.put('/user/:userId', (req, res) => {
-    const { userId } = req.params;
+router.put('/:id', (req, res) => {
+    const { id } = req.params;
     const { name, email, password, birthDate, diseases } = req.body;  // diseases is an array of disease names
 
     // Optional: Hash password if it's being updated
@@ -90,12 +90,12 @@ router.put('/user/:userId', (req, res) => {
 });
 
 // Remove disease from user's history (DELETE request)
-router.delete('/user/:userId/disease/:diseaseId', (req, res) => {
-    const { userId, diseaseId } = req.params;
+router.delete('/:id/disease/:diseaseId', (req, res) => {
+    const { id, diseaseId } = req.params;
 
     // Delete disease from user's history
     const deleteQuery = 'DELETE FROM riwayat_user WHERE id_user = ? AND id_penyakit = ?';
-    db.query(deleteQuery, [userId, diseaseId], (err) => {
+    db.query(deleteQuery, [id, diseaseId], (err) => {
         if (err) return res.status(500).json({ error: err.message });
 
         res.status(200).json({ message: 'Disease removed from history' });
