@@ -103,7 +103,7 @@ router.get('/', (req, res) => {
             d.gambar,
             d.caption,
             d.timestamp,
-            COUNT(DISTINCT l.id_like) AS jumlah_like,
+            COUNT(DISTINCT l.id_discuss) AS jumlah_like,
             COUNT(DISTINCT d2.id_discuss) AS jumlah_reply
         FROM discussion d
         JOIN user u ON d.id_user = u.id_user
