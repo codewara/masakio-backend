@@ -11,6 +11,15 @@ router.post('/add', (req, res) => {
     });
 });
 
+router.post('/reply', (req, res) => {
+    const { id_user, gambar, caption, reply_to } = req.body;
+    db.query('INSERT INTO discussion (id_user, gambar, caption, timestamp, reply_to) VALUES (?, ?, ?, NOW(), ?)',
+    [id_user, gambar ?? null, caption, reply_to], (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.status(201).json({ message: 'Reply added successfully', id_discuss: results.insertId });
+    });
+});
+
 router.get('/like', (req, res) => {
     const { user_id: id_user, post_id: id_discuss } = req.query;
     db.query('SELECT * FROM likes WHERE id_user = ? AND id_discuss = ?', [id_user, id_discuss], (err, results) => {
