@@ -94,6 +94,14 @@ router.get('/:id', (req, res) => {
     });
 });
 
+router.delete('/:id', (req, res) => {
+    const id = req.params.id;
+    db.query('DELETE FROM discussion WHERE id_discuss = ?', [id], (err) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ message: 'Discussion deleted' });
+    });
+});
+
 router.get('/', (req, res) => {
     db.query(`
         SELECT
