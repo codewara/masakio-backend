@@ -53,7 +53,14 @@ router.get('/:id', (req, res) => {
     const id = req.params.id;
     result = {};
     db.query(`
-        SELECT d.id_discuss, u.nama_user, u.foto, d.gambar, d.caption, d.timestamp, COUNT(l.id_discuss) AS jumlah_like
+        SELECT
+            d.id_discuss,
+            u.nama_user,
+            u.foto,
+            d.gambar,
+            d.caption,
+            d.timestamp,
+            COUNT(DISTINCT l.id_discuss) AS jumlah_like
         FROM discussion d
         JOIN user u ON d.id_user = u.id_user
         LEFT JOIN likes l ON d.id_discuss = l.id_discuss
@@ -64,7 +71,15 @@ router.get('/:id', (req, res) => {
         if (!result) return res.status(404).json({ error: 'Discussion not found' });
 
         db.query(`
-            SELECT d.id_discuss, u.nama_user, u.foto, d.gambar, d.caption, d.timestamp, COUNT(l.id_discuss) AS jumlah_like, COUNT(d2.reply_to) AS jumlah_reply
+            SELECT
+                d.id_discuss,
+                u.nama_user,
+                u.foto,
+                d.gambar,
+                d.caption,
+                d.timestamp,
+                COUNT(DISTINCT l.id_discuss) AS jumlah_like,
+                COUNT(DISTINCT d2.reply_to) AS jumlah_reply
             FROM discussion d
             JOIN user u ON d.id_user = u.id_user
             LEFT JOIN discussion d2 ON d.id_discuss = d2.reply_to
@@ -81,7 +96,15 @@ router.get('/:id', (req, res) => {
 
 router.get('/', (req, res) => {
     db.query(`
-        SELECT d.id_discuss, u.nama_user, u.foto, d.gambar, d.caption, d.timestamp, COUNT(l.id_discuss) AS jumlah_like, COUNT(d2.reply_to) AS jumlah_reply
+        SELECT
+            d.id_discuss,
+            u.nama_user,
+            u.foto,
+            d.gambar,
+            d.caption,
+            d.timestamp,
+            COUNT(DISTINCT l.id_like) AS jumlah_like,
+            COUNT(DISTINCT d2.id_discuss) AS jumlah_reply
         FROM discussion d
         JOIN user u ON d.id_user = u.id_user
         LEFT JOIN discussion d2 ON d.id_discuss = d2.reply_to
